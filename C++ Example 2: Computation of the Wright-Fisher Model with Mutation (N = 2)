@@ -1,1 +1,24 @@
+int main()
+{
+	double N = 2; //population size
 
+	double u = 0, v = 0.9; //these are the mutation rates
+
+	double p = 0; //this is the transition probability, initialized to zero
+
+	for (int i = 0; i < 2 * N + 1; i++)
+	{
+		for (int j = 0; j < 2 * N + 1; j++)
+		{
+			p = choosing(2 * N, j) 
+				* pow((i * (1 - u) + (2 * N - i) * v) 
+                        / (2 * N), j) 
+				* pow(1 - ((i * (1 - u) + (2 * N - i) * v)) 
+                        / (2 * N), (2 * N - j));
+			cout << " " << p << " ";
+		}
+		cout << endl; 
+	}
+
+	return 0; 
+}
