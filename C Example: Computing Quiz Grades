@@ -1,1 +1,180 @@
+#include <stdio.h>
 
+void getName(FILE* inputStream, FILE* outputStream, char nameAsArray[]);
+//precondition:
+//input and output streams are ready for use and are not NULL
+//postcondition:
+//scans a name of less than 10 characters into an array
+
+double quizAverage(FILE* inputStream, FILE* outputStream);
+//precondition:
+//input and output streams are ready for use and are not NULL
+//postcondition:
+//the scores and computed average will be printed to the output stream
+
+int main(int argc, char* argv[])
+{
+    //file handles for input and output files
+    //initialized to NULL
+    FILE* inputFile = NULL;
+    FILE* outputFile = NULL;
+
+    //character arrays to be passed to the getName function
+    char first[10];
+    char last[10];
+
+    int j = 0, i = 0, k = 0; //index variables i, j, k
+    int ret = 0, checking; //ret is the return value of fscanf
+
+    int counter = 0, remaining; 
+    //counter records the number of letters in the student's name
+    //so that remaining can be calculated
+    //to make a total of 20 spaces for the output
+
+    //opens input file for reading and output file for writing
+    inputFile = fopen("quiz_test.txt", "r");
+    outputFile = fopen("average.txt", "w");
+
+    //checks for a proper input file
+    if (inputFile == NULL)
+    {
+        printf("Could not open input file.\n");
+        return -1; //returns -1 in error
+    }
+
+    //checks for a proper output file
+    if (outputFile == NULL)
+    {
+        printf("Could not open output file.\n");
+        return -1; //returns -1 in error
+    }
+
+    while(ret != EOF) //while loop runs until it reaches end of file
+    {
+        getName(inputFile, outputFile, first); //takes in first name        
+        getName(inputFile, outputFile, last); //takes in last name
+
+        //for loop prints out last name character by character
+        for (j = 0; j < 9; j++)
+        {
+            if (isalpha(last[j]))
+            {
+                fprintf(outputFile, "%c", last[j]);
+                counter += 1; //increments counter by one
+            }
+            else
+                break;
+        }
+
+        //prints out the comma and space between first and surnames
+        fprintf(outputFile, ", "); 
+
+        //for loop prints out first name character by character
+        for (i = 0; i < 9; i++)
+        {
+            if (first[i] == ' ') //checks if letters of the first name are a space
+                break;
+            else //otherwise, prints first name
+            {
+                counter += 1; //increments counter by one 
+                fprintf(outputFile, "%c", first[i]);
+            }
+        }
+
+        //remaining is the number of spaces to be printed
+        //after the student's name to come to a total of 20
+        remaining = 20 - counter; 
+        
+        //counter is re-initialized to zero for the next loop (next student)
+        counter = 0; 
+
+        //prints the number of spaces held in remaining to the output file
+        for (k = 0; k < remaining; k++)
+        {
+            fprintf(outputFile, " ");
+        }
+
+        //calls the quizAverage function and prints the average
+        //to 2 decimal points in width 10
+        fprintf(outputFile, " %10.2lf\n", quizAverage(inputFile, outputFile));
+
+        ret = fscanf(inputFile, "%d", &checking); 
+    }
+
+    //always close your files!
+    fclose(inputFile); 
+    fclose(outputFile); 
+
+    return 0;
+}
+
+void getName(FILE* inputStream, FILE* outputStream, char nameAsArray[])
+{
+    int numOfConversions, i = 0;
+
+    //numOfConversions assigned the return value of fscanf
+    //fscanf takes in the first character in the passed array
+    numOfConversions = fscanf(inputStream, "%c", &nameAsArray[i]);
+
+    //reads while elements are not new lines
+    while(nameAsArray[i] != '\n')
+    {
+        //if the while condition is true AND i < 9, increment i
+        if (i < 9)
+        {
+            i += 1;
+        }
+        //otherwise, break
+        else
+        {
+            break;
+        }
+
+        //update numOfConversions with next scanned-in value
+        numOfConversions = fscanf(inputStream, "%c", &nameAsArray[i]);
+
+        //once you get to a space, break
+        if (nameAsArray[i] == ' ')
+            break; 
+    }
+
+    //automatically make the last element a null terminator
+    nameAsArray[9] = '\0';
+
+    return;
+}
+
+double quizAverage(FILE* inputStream, FILE* outputStream)
+{
+    double average = 0; //initialize average to 0
+    int sum = 0; //initialize sum to 0
+
+    int score[10];
+    int numOfConversions;
+
+    score[0] = 0; 
+    
+    int i;
+
+    for (i = 0; i < 10; i++)
+    {
+        //if a score is out of range, assign a score of 0
+        if (score[i] < 0 || score[i] > 100)
+            score[i] = 0; 
+
+        //takes in each score one at a time
+        numOfConversions = fscanf(inputStream, " %d", &score[i]);
+
+        //each score is added to the running total (sum)
+        sum += score[i];
+
+        //prints each score in a width of 4 characters
+        fprintf(outputStream, "%4d ", score[i]);
+    }
+
+    //computes the average of 10 quiz scores
+    average = sum / 10.0;
+
+    //returns the calculated average
+    return average; 
+}
