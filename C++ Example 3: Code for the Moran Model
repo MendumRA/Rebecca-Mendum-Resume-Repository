@@ -1,1 +1,76 @@
+#include <iostream>
+using namespace std;
+int main()
+{
+	double N = 3; //population size
 
+	double u = 0.25, v = 0.25; //these are the mutation rates
+
+	//this is the probability of moving between i and i - 1 states
+
+	double p_inc = 0, p_dec = 0, p_same = 0;
+	
+	double i = 0; 
+
+	p_inc = (i * (2 * N - i) * (1 - u) + v * pow(2 * N - i, 2.0)) 
+            / pow(2 * N, 2.0);
+	p_same = 1 - p_inc; 
+
+	cout << " " << p_same; 
+	cout << " " << p_inc; 
+
+	//outputs leading zeroes for the first line
+	for (int k = 1; k <= 2 * N - 1; k++)
+	{
+		cout << " 0 ";
+	}
+
+	cout << endl; 
+
+        for (int i = 1; i <= 2 * N - 1; i++)
+		{
+			p_dec = (i * (2 * N - i) * (1 - v) + u * pow(i, 2.0)) 
+                        / pow(2 * N, 2.0);
+
+			p_inc = (i * (2 * N - i) * (1 - u) + 
+            v * pow(2 * N - i, 2.0)) 
+            / pow(2 * N, 2.0);
+
+			p_same = 1 - p_dec - p_inc;
+
+			//pre-leading zeroes for inner lines
+			for (int k = 1; k < i; k++)
+			{
+				cout << " 0 ";
+			}
+
+			cout << " " << p_dec;
+			cout << " " << p_same;
+			cout << " " << p_inc;
+
+			//post-zeroes for inner lines
+			for (int m = 2 * N - i; m > 1; m--)
+			{
+				cout << " 0 ";
+			}
+
+			cout << endl;
+		}
+  
+		i = 2 * N; 
+
+		p_dec = (i * (2 * N - i) * (1 - v) + u * pow(i, 2.0))
+                        / pow(2 * N, 2.0);
+		p_same = 1 - p_dec; 
+
+
+		//outputs leadings zeroes for the last line
+		for (int k = 0; k < 2 * N - 1; k++)
+		{
+			cout << " 0 ";
+		}
+
+		cout << p_dec << " " << p_same;
+
+	return 0;
+}
