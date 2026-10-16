@@ -1,1 +1,49 @@
+#include <iostream>
+#include <cmath>
+using namespace std;
 
+int factorial(int my_input); 
+//takes the factorial of a number
+
+double choosing(double n, double k);
+//returns n choose k
+
+int main()
+{
+	double p_6j = 0; 
+	double sum = 0; 
+	
+	//N = 3
+	for (int j = 0; j < 7; j++)
+	{
+		p_6j = choosing(6, j) * pow((6.0 / 6), j) * 
+                                    pow((0/ 6), 6 - j);
+		sum += p_6j; 
+		cout << p_6j << endl; 
+	}
+
+	cout << sum << endl;
+
+	return 0;
+}
+
+int factorial(int my_input)
+{
+	int ans = 1;
+
+	for (int i = 1; i < my_input; i++)
+	{
+		ans = ans * (i + 1);
+	}
+
+	return ans; 
+}
+
+double choosing(double n, double k)
+{
+	double ans = 0;
+
+	ans = factorial(n) / (factorial(k) * factorial(n - k));
+
+	return ans; 
+}
