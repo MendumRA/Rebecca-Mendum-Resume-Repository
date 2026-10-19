@@ -1,0 +1,277 @@
+---
+title: "Final Project"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+```
+
+
+## Project Prompt
+You and your team of data scientists were hired by a company to gain insights on the dataset in your assigned prompt, and to communicate these insights with the company's CEO, CMO, and Director of Data Science.
+
+1. Perform any necessary data pre-processing and cleaning, and document your steps. Depending on the prompt you are assigned, this may involve transforming variables, creating new variables, and/or merging data frames. In particular, you may need to make some decisions on how to handle missing data, such as removing rows or columns with a significant amount of missing observations, creating an "unknown" category, or replacing/imputing the missing values. You do not need to develop a rigorous process or cite references, but please briefly justify your choices.
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(readr)
+questionnaire <- read_csv("C:/Users/Hp/Desktop/NHANES_Rebecca/questionnaire.csv")
+covariate_df <- read_csv("C:/Users/Hp/Desktop/NHANES_Rebecca/covariate_df.rData")
+outcomes_only <- dplyr::select(questionnaire, SEQN, DPQ020, DPQ100) 
+
+load("C:/Users/Hp/Documents/covariate_df.rData")
+full_df <- full_join(covariate_df, outcomes_only)
+
+#looking at the amount of missingness in outcome
+sum(is.na(full_df$DPQ020))
+#looking at total size of full (joined) data frame
+dim(full_df)
+
+#want to drop rows with missing outcome data
+bad_missing_indices <- which(is.na(full_df$DPQ020))
+modified_full_df <- full_df[-bad_missing_indices,]
+
+#want to ignore values for depression that are not 1 or 2
+not_1_or_2_indices <- which(modified_full_df$DPQ020 != 1 & modified_full_df$DPQ020 != 2)
+#use DeMorgan's Law: not (1 or 2) is logically equivalent to not 1 and not 2
+modified2_full_df <- modified_full_df[-not_1_or_2_indices,]
+```
+
+After doing this data pre-processing, only rows with complete outcome data on depression have been kept. Note that I did perform median imputation later in the code (Rmd file), after realizing that k nearest neighbors model would not run with missing data. I chose median imputation rather than mean imputation because the variables I chose have histograms that do not support the normality assumption. 
+
+2. Include a "Table 1" of summary statistics for the variables you end up using in your models.
+
+```{r}
+#need to know which variables are normal and which are not normally distributed (for Table One to be correctly displayed with median and IQR)
+
+#starting with DR1TVD
+hist_DR1TVD <- modified2_full_df %>% ggplot(aes(DR1TVD)) +
+  geom_histogram(bins = 20)
+hist_DR1TVD
+#conclusion: not normal
+
+#potentially including DPQ100
+hist_DPQ100 <- modified2_full_df %>% ggplot(aes(DPQ100)) +
+  geom_histogram(bins = 9)
+hist_DPQ100
+#conclusion: not normal
+
+#next up: DR1TFIBE
+hist_DR1TFIBE <- modified2_full_df %>% ggplot(aes(DR1TFIBE)) +
+  geom_histogram()
+hist_DR1TFIBE
+#conclusion: not normal
+
+#next up: DR1TSUGR
+hist_DR1TSUGR <- modified2_full_df %>% ggplot(aes(DR1TSUGR)) +
+  geom_histogram(bins = 20)
+hist_DR1TSUGR
+#conclusion: not normal
+
+#next up: DR1TSFAT
+hist_DR1TSFAT <- modified2_full_df %>% ggplot(aes(DR1TSFAT)) +
+  geom_histogram(bins = 20)
+hist_DR1TSFAT
+#conclusion: not normal
+
+#next up: DR1TCHOL
+hist_DR1TCHOL <- modified2_full_df %>% ggplot(aes(DR1TCHOL)) +
+  geom_histogram()
+hist_DR1TCHOL
+#conclusion: not normal
+
+#none of my variables are normally distributed
+```
+
+```{r}
+library(tableone)
+
+my_vars <- c("DR1TVD", "DPQ100", "DR1TFIBE", "DR1TSUGR", "DR1TSFAT", "DR1TCHOL")
+
+t1 <- CreateTableOne(vars = my_vars, strata = c("DPQ020"), data = modified2_full_df)
+t1
+summary(t1)
+kableone(t1, nonnormal = my_vars)
+```
+
+
+3. Make and interpret 2-6 visualizations to help you understand the relationships between the variables in your dataset. We highly encourage you to explore the data on your own, but when preparing your response to this question, please be parsimonious in your plots and select visualizations that help you tell a story about the data. If you need to make additional plots to support your responses to the other questions (e.g., to motivate data cleaning or modeling choices), that's fine. 
+
+
+This (hypothetical) group of scientists is interested in learning about the relationship between nutritional status and depression as an outcome. 
+
+Vitamin D deficiency is commonly known to contribute to depression, and we would like to know if the NHANES data set supports this conclusion. We are also looking at fiber, sugar, saturated fat, and cholesterol consumption. 
+
+```{r}
+#install.packages("corrplot")
+library(corrplot)
+my_vars_corr <- c("DR1TVD", "DR1TFIBE", "DR1TSUGR", "DR1TSFAT", "DR1TCHOL")
+data_subset <- modified2_full_df[,my_vars_corr]
+corr_matrix <- cor(data_subset, method = "spearman", use = "pairwise.complete.obs")
+corrplot(corr_matrix, type = "upper")
+```
+
+From this visualization, it appears all variables are positively correlated with each other. In other words, as a person consumes more vitamin D, fiber, sugar, saturated fat, or cholesterol, they on average consume more of the other dietary components as well.
+
+Let us examine the relationship between vitamin D consumption and depression, as evidenced by the variable "DPQ020." Scientists and physicians believe that vitamin D deficiency can contribute to depression, either causing it or worsening symptoms. 
+
+```{r}
+modified3_full_df <- modified2_full_df %>%
+  mutate(group = ifelse(DPQ020 == 1, "Depressed", "Not Clinically Depressed"))
+
+vit_D_and_fiber_and_depression_plot <- modified3_full_df %>%
+  ggplot(aes(x = DR1TVD, y = DR1TFIBE, color = group)) +
+  geom_point(na.rm = TRUE)
+vit_D_and_fiber_and_depression_plot
+
+lin_model <- lm(DR1TFIBE ~ DR1TVD, data = modified3_full_df)
+
+library(ggfortify)
+autoplot(lin_model)
+shapiro.test(residuals(lin_model))
+```
+
+The linearity assumptions are not met in this data set (Shapiro-Wilk normality test has p-value less than 0.05), so we will not fit a linear curve to show on the graph as well. What the graph does tell us, however, is that there is not an important relationship between vitamin D consumption and total fiber consumption, among both depressed individuals and people who do not meet criteria for clinical depression, at least according to these sample data. Fiber and vitamin D are both positive additions to a diet (meaning more, to a certain extent, is generally better), yet they are not related very strongly, as this plot suggests. 
+
+4. Build any 2 machine learning models that use your choice of covariates to predict the given outcome variable. Explain why you chose those covariates and interpret model performance for each model. Be sure to include the confusion matrix for each model, one AUROC plot with a line for each model, as well as the values of AUC for each model. If you are including categorical variables as covariates in a `glmnet` model (lasso or ridge regression), please remember that you will need to convert your covariate data frame into a *model matrix*, e.g., by calling the `model.matrix` function:
+
+```{r}
+library(splitstackshape)
+library(dplyr)
+library(tree)
+library(caret)
+#model_matrix = model.matrix(~.-1, my_covariate_df)
+
+#setting up machine learning
+class(modified2_full_df$DPQ020)
+my_outcome_as_factor <- modified2_full_df %>% 
+  mutate(depression_dx = as.factor(DPQ020))
+tiny_df <- my_outcome_as_factor %>%
+  select("SEQN", "DR1TVD", "DPQ100", "DR1TFIBE", "DR1TSUGR", "DR1TSFAT", "DR1TCHOL", "DPQ020", "depression_dx")
+rownames(tiny_df) <- 1:nrow(tiny_df)
+class(my_outcome_as_factor$depression_dx)
+head(tiny_df)
+
+#copied the provided code from HW 5 here to set up ML
+set.seed(1)
+x <- stratified(tiny_df, "depression_dx", 0.7, keep.rownames = TRUE)
+summary(x)
+train_set <- x %>% dplyr::select(-rn)
+train_index <- as.numeric(x$rn)
+test_set <- tiny_df[-train_index,]
+test_set_y <- as.factor(test_set$depression_dx)
+
+dim(train_set)
+dim(test_set)
+
+#realizing that knn won't run with any missing data, will run median imputation, as data is nonnormal
+#copying code from slide 706 (of 806 total slides for the semester)
+train_x <- train_set %>% dplyr::select(-c(depression_dx, DPQ020))
+train_y <- train_set$depression_dx
+
+test_x <- test_set %>% dplyr::select(-c("depression_dx", "DPQ020"))
+test_y <- test_set$depression_dx
+
+imputation_model <- preProcess(train_x, method = "medianImpute")
+
+train_x_imp <- predict(imputation_model, train_x)
+test_x_imp <- predict(imputation_model, test_x)
+
+#step 5: reattach predictors and outcome
+final_imputed_train <- train_x_imp %>%
+  mutate(depression_dx = train_y)
+final_imputed_test <- test_x_imp %>%
+  mutate(depression_dx = test_y)
+
+#machine learning model 1: k nearest neighbors
+knn_fit <- knn3(depression_dx ~ ., data = final_imputed_train, k = 12)
+knn_fit
+p_hat_knn <- predict(knn_fit, newdata = final_imputed_test, type = "prob")[,2]
+summary(p_hat_knn)
+y_hat_knn <- ifelse(p_hat_knn > 0.5, "Depressed", "Not Clinically Depressed")
+y_hat_knn_edited <- ifelse(y_hat_knn == "Depressed", 1, 2)
+cm_knn <- confusionMatrix(
+  data = as.factor(y_hat_knn_edited),
+                          reference = final_imputed_test$depression_dx,
+  positive = "1")
+cm_knn
+
+#see next chunk for machine learning model #2
+```
+
+Accuracy of the k-nearest neighbors model is 0.194 (95\% CI: 0.1531, 0.2405), which is worse than guessing. This indicates that the model classifying almost everyone as not depressed when some individuals in fact have depression. An enormous number of people (off the main diagonal in the confusion matrix) fall into the category with 270 individuals, who do experience depression despite the model misclassifying these individuals as unaffected. The perfect specificity (100\%) and the fact that in the testing data, 271 people have depression versus 64 unaffected individuals, means that probably there are additionally errors in the splitting of training and testing data, as the training and testing sets should each have approximately equal numbers of depressed and not depressed survey participants, since that is the function of the "splitstackshape" package. In the actual survey data, only a minority of people experienced clinical depression, in contrast to the majority in this testing data set, indicating a problem. 
+
+```{r}
+#machine learning model 2: classification tree
+tree_fit = tree(depression_dx ~ ., 
+                data = final_imputed_train)
+summary(tree_fit)
+
+plot.new()
+plot(tree_fit, type = "uniform")
+text(tree_fit, pretty = 0)
+
+p_hat_tree <- predict(tree_fit, 
+                      newdata = final_imputed_test)[,2]
+#p_hat_tree
+y_hat_tree <- ifelse(p_hat_tree > 0.5, "Depressed", "Not Clinically Depressed")
+#y_hat_tree
+y_hat_tree_edited <- ifelse(y_hat_tree == 
+                              "Depressed", 1, 2)
+cm_tree <- confusionMatrix(
+  data = as.factor(y_hat_tree_edited),
+  reference = final_imputed_test$depression_dx,
+  positive = "1")
+cm_tree
+```
+
+The classification tree model, according to the confusion matrix, failed to classify anyone as affected by depression using all the variables available to it (although only DPQ100, extent to which depression is impacting daily life and making it difficult; SEQN, the participant's identification number; and DR1TVD, the total daily intake of vitamin D on the first day of the interview series were actually used by the model). In other words, the inflated specificity value of 100\% (perfect classification) and the extremely low value for sensitivity (0\%) means that model is essentially "dumping" all people into the "not depressed" category without regard for their individual covariate values and reaping the "benefit" of getting approximately 50\% (balanced accuracy = 50\%) of people correctly classified as a side effect of doing this "dumping" procedure. The overall accuracy is 0.191 (95\% CI: 0.1503, 0.2373). This overall, when combined with the conclusions drawn after running the k-nearest neighbors model, means that probably there is an overarching issue with the data set or the training/testing split, not with the code used to run the models themselves. 
+
+```{r}
+library(pROC)
+#model 1: k nearest neighbors
+roc_knn <- roc(final_imputed_test$depression_dx,
+               p_hat_knn)
+#model 2: classification tree
+roc_tree <- roc(final_imputed_test$depression_dx,
+                p_hat_tree)
+#plotting both ROC on same graph
+ggroc(list("k nearest neighbors" = roc_knn, "decision tree" = roc_tree)) +
+  theme(legend.title = element_blank()) +
+  geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+               color = "black",
+               linetype = "dashed") +
+  ylab("Sensitivity") +
+  xlab("Specificity")
+```
+
+```{r}
+#model 1: knn model
+auc(roc_knn)
+```
+
+```{r}
+#model 2: decision tree
+auc(roc_tree)
+```
+
+5. Provide a summary of your findings/conclusions/recommendations in a way that people with a non-technical background (like the CEO and CMO) can understand. 
+
+Based on our findings, there is insufficient evidence to conclude that various aspects of diet (total sugar, total saturated fat, total cholesterol, daily intake of vitamin D, and total fiber content) can predict a depression diagnosis. A major limitation of the models run here is that they vastly over predict people as not having depression when in fact they do. If medical professionals wanted to draw conclusions between dietary status and depression diagnosis status, they would need to perform further research, perhaps incorporating more variables that are more closely linked to depression (such as anxiety or major life events, which are not data included in NHANES).
+
+6. Is there any additional information or data that might be useful to collect/have for answering your prompt?
+
+After accounting for the limitations of the models run in this file, other data that would be helpful for predicting depression might be other mental health factors such as an anxiety level, an average stress level, and knowledge about major life events (such as birth, divorce, or death in the family). It appears, based on this preliminary exploration of the data, that dietary factors do not influence or predict a diagnosis of clinical depression well at all. 
+
+### NHANES (2013-2014)
+
+The National Health and Nutrition Examination Survey (NHANES) assesses the health and nutritional status of adults and children in the United States. The `covariate_df` data frame in the `covariate_df.rData` file contains the demographic, examination, diet, and lab data from [NHANES 2013-2014](https://www.kaggle.com/datasets/cdc/national-health-and-nutrition-examination-survey). You can peruse the dictionaries for the variables on the CDC website: [demographics](https://wwwn.cdc.gov/Nchs/Nhanes/Search/variablelist.aspx?Component=Demographics&CycleBeginYear=2013), 
+[examinations](https://wwwn.cdc.gov/Nchs/Nhanes/Search/variablelist.aspx?Component=Examination&CycleBeginYear=2013), 
+[diet](https://wwwn.cdc.gov/Nchs/Nhanes/Search/variablelist.aspx?Component=Dietary&CycleBeginYear=2013), and
+[lab](https://wwwn.cdc.gov/Nchs/Nhanes/Search/variablelist.aspx?Component=Laboratory&CycleBeginYear=2013). **Your goal is to use these covariates to predict the occurrence of diabetes, cancer, heart attack, stroke, OR depression. The company wants you to recommend a predictive model and identify key variables that appear to associated with the outcome disease.** 
+
+As part of data processing, choose ONE of the five diseases (diabetes, cancer, heart attack, stroke, depression) and merge the corresponding variable from the `questionnaire.csv` dataset with `covariate_df`. A binary variable indicating if a person has this disease is the outcome that your model should predict. The relevant variable names in `questionnaire.csv` are: DIQ010 (diabetes), MCQ220 (cancer), MCQ160E (heart attack), MCQ160F (stroke), and DPQ020 (depression). (You can view the entire questionnaire dictionary [here](https://wwwn.cdc.gov/Nchs/Nhanes/Search/variablelist.aspx?Component=Questionnaire&CycleBeginYear=2013).) For each disease variable, you can take `1` to be affected, `2` to be unaffected, and all other numeric values to be unknown/ignored (i.e., remove all rows with any values not equal to 1 or 2 for the disease you choose). 
+
+
