@@ -1,0 +1,107 @@
+import math
+import sys
+
+
+#zeroth function
+#evaluates a function at a point x
+def f(x, coeff):
+    #initialize sum at zero
+    sum = 0
+    #loop over indices
+    for index in range(len(coeff)):
+        #update sum by adding the next term
+        sum += coeff[index] * x ** index
+    #return the updated sum, outside loop
+    return sum
+
+#second function (first one got scrapped)
+#taking derivative of a polynomial (not monomial)
+def deriv_polynomial(coeff):
+    #set the degree of the polynomial (based on list length)
+    n = len(coeff) - 1
+    #define empty dictionary for new_coefficients
+    new_coeffs = {}
+    #loop over exponents in terms
+    for power in range(n + 1):
+        #check for constant term
+        if power == 0:
+            #this term just drops off (d/dx [a] = 0 for all a in \mathbb{R})
+            continue
+        else:
+            #bring down exponent and multiply by coefficient
+            new_coeffs[power - 1] = power * coeff[power]
+    #return dictionary of coefficients
+    return new_coeffs
+
+
+#third function
+#compute Newton's method
+def Newton(guess, my_polynomial):
+    #set the list of guesses to be an empty list
+    my_guesses = []
+    #take the initial guess and make it the zeroth element of the list
+    my_guesses.append(guess)
+    #start counter variable, will be incremented by one each iteration
+    counter = 1
+    #calculate derivative outside of the loop
+    my_deriv = deriv_polynomial(my_polynomial)
+    #loop runs while counter is less than one million (to avoid infinite loop),
+    #and one of the following two conditions holds:
+    #counter is one (first iteration of the loop), or absolute difference between consecutive
+    #guesses is still "big" (greater than some epsilon, which I've set at 1e-6)
+    while(counter < 1e6 and (counter == 1 or abs(my_guesses[counter - 2] - my_guesses[counter - 1]) > 1e-6)):
+        #checks for derivative equal to zero (making it impossble to use Newton's method)
+        #evaluates the derivative of my_polynomial at x = guess
+        if f(guess, deriv_polynomial(my_polynomial)) == 0:
+            #exit gracefully
+            sys.exit("you can't use Newton's method here (sorry)")   
+        else:
+            #calculate numerator of fraction used in Newton's method
+            num = f(my_guesses[counter - 1], my_polynomial)
+            #calculate denominator of fraction used in Newton's method
+            denom = f(my_guesses[counter - 1], my_deriv)
+            #possible problem that denominator equals zero
+            if denom == 0:
+                #exit gracefully
+                sys.exit("something is wrong, can't divide by zero (sorry)")
+            #assuming no such problem
+            else:
+                #calculate fraction (avoids "golf code")
+                quotient = num / denom
+            #calculate next iteration of Newton's method
+            #saved in my_guesses
+            #my_guesses[counter] = my_guesses[counter - 1] - quotient
+            my_guesses.append(my_guesses[counter - 1] - quotient)
+        #update counter (increment by one)
+        counter += 1        
+    #function returns last guess in list
+    return my_guesses[counter - 1]
+
+
+#fourth set of code (support code)
+#take input from the user and provide output
+#written like problem 5 of HW5
+if __name__ == "__main__":
+    #initialize my coefficients (as numeric)
+    #as an empty list
+    as_numeric_coeffs = []
+    #check how many arguments were entered on the command line
+    if len(sys.argv) != 3:
+        #exit gracefully with an error message
+        sys.exit("expected three arguments")
+    #assuming you got the right number of arguments
+    else:
+        #convert guess to float
+        guess = float(sys.argv[1])
+        #take in coefficients from the command line (as strings)
+        coeffs = sys.argv[2]
+        #loop over items split by commas
+        for item in coeffs.split(","):
+            #append them to the list as floats
+            as_numeric_coeffs.append(float(item))
+    #find the root using Newton's method (yay)
+    root = Newton(guess, as_numeric_coeffs)
+    #print the estimated root to the screen
+    print("The root nearest to your guess is", root)
+    #print the distance from zero
+    print("The root is this far away from zero:", abs(f(root, as_numeric_coeffs)))
